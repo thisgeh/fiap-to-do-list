@@ -24,10 +24,7 @@ class TarefaDaoTest {
         database = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             TarefaDatabase::class.java
-        )
-            .allowMainThreadQueries()
-            .build()
-
+        ).allowMainThreadQueries().build()
         dao = database.tarefaDao()
     }
 
@@ -38,16 +35,10 @@ class TarefaDaoTest {
 
     @Test
     fun inserirTarefaEListar() = runTest {
-
-        val tarefa = Tarefa(
-            titulo = "Estudar Room",
-            descricao = "Aprender Entity e DAO"
-        )
-
+        val tarefa = Tarefa(titulo = "Estudar Room", descricao = "Aprender Entity e DAO")
         dao.inserir(tarefa)
 
         val tarefas = dao.listarTodas().first()
-
         assertEquals(1, tarefas.size)
         assertEquals("Estudar Room", tarefas[0].titulo)
         assertFalse(tarefas[0].concluida)
@@ -55,41 +46,23 @@ class TarefaDaoTest {
 
     @Test
     fun marcarTarefaComoConcluida() = runTest {
-
-        dao.inserir(
-            Tarefa(
-                titulo = "Tarefa 1",
-                descricao = ""
-            )
-        )
-
+        dao.inserir(Tarefa(titulo = "Tarefa 1", descricao = ""))
         val inserida = dao.listarTodas().first().first()
 
-        dao.atualizar(
-            inserida.copy(concluida = true)
-        )
+        dao.atualizar(inserida.copy(concluida = true))
 
         val atualizada = dao.listarTodas().first().first()
-
         assertTrue(atualizada.concluida)
     }
 
     @Test
     fun deletarTarefa() = runTest {
-
-        dao.inserir(
-            Tarefa(
-                titulo = "Para deletar",
-                descricao = ""
-            )
-        )
-
+        dao.inserir(Tarefa(titulo = "Para deletar", descricao = ""))
         val inserida = dao.listarTodas().first().first()
 
         dao.deletar(inserida)
 
         val tarefas = dao.listarTodas().first()
-
         assertTrue(tarefas.isEmpty())
     }
 }

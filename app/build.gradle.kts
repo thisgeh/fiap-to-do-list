@@ -42,34 +42,30 @@ android {
 
 dependencies {
 
-    // Compose
+    implementation(libs.androidx.compose.material.icons.core)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
 
-    // Android
     implementation(libs.androidx.core.ktx)
 
-    // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
-    // Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Testes locais
     testImplementation(libs.junit)
 
-    // Testes instrumentados
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.junit)
@@ -77,7 +73,6 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.kotlinx.coroutines.test)
 
-    // Ferramentas de debug do Compose
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
