@@ -98,16 +98,16 @@ As imagens abaixo estão na pasta [`prints/`](./prints) na raiz do repositório.
 
 ### Tela inicial com a lista de tarefas
 
-![Tela inicial](./prints/telainicial.png)
+![Tela inicial](/prints/telainicial.png)
 
 ### Cadastro de uma nova tarefa
 
-![Tela de cadastro](./prints/teladecadastramento.png)
+![Tela de cadastro](/prints/teladecadastramento.png)
 
 ### Tarefa cadastrada aparecendo na lista
 
-![Lista com tarefa](./prints/telacomtarefa.png)
+![Lista com tarefa](/prints/telacomtarefa.png)
 
 ### Tarefa marcada como concluída
 
-![Tarefa concluída](./prints/tarefaconcluida.png)
+![Tarefa concluída](/prints/tarefaconcluida.png)
