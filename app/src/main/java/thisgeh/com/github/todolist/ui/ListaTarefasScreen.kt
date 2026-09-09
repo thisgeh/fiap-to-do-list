@@ -30,6 +30,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import thisgeh.com.github.todolist.data.Tarefa
 import thisgeh.com.github.todolist.viewmodel.TarefaViewModel
+import thisgeh.com.github.todolist.util.formatarDataHora
 
 @Composable
 fun ListaTarefasScreen(
@@ -139,6 +142,16 @@ private fun TarefaItem(
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (tarefa.dataHora != null) {
+                    val prazo = tarefa.dataHora
+                    val atrasada = prazo < System.currentTimeMillis() && !tarefa.concluida
+                    Text(
+                        text = formatarDataHora(prazo),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (atrasada) MaterialTheme.colorScheme.error else Color.Unspecified,
+                        fontWeight = if (atrasada) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
