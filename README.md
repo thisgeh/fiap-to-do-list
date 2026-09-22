@@ -1,11 +1,11 @@
 # To-Do List — Android (Jetpack Compose + Room)
 
-Aplicativo Android de lista de tarefas desenvolvido como atividade individual da FIAP. O objetivo do projeto é evoluir uma base já existente (camada de dados com Room) implementando a camada de apresentação (UI em Jetpack Compose), a integração com a arquitetura (Repository e ViewModel) e a navegação entre telas (Navigation Compose), permitindo ao usuário **listar, criar, editar, concluir e excluir tarefas**.
+Aplicativo Android de lista de tarefas desenvolvido como atividade individual da FIAP. O objetivo do projeto é evoluir uma base já existente (camada de dados com Room) implementando a camada de apresentação (UI em Jetpack Compose), a integração com a arquitetura (Repository e ViewModel) e a navegação entre telas (Navigation Compose), permitindo ao usuário **listar, criar, editar, concluir e excluir tarefas**, com definição de prazo e exclusão segura mediante confirmação.
 
 ## Tecnologias utilizadas
 
 - **Kotlin** — linguagem principal do projeto.
-- **Jetpack Compose** — construção declarativa da interface (telas, componentes e previews).
+- **Jetpack Compose + Material 3** — construção declarativa da interface (telas, componentes, diálogos e previews).
 - **Room** — persistência local das tarefas em banco SQLite (`Tarefa`, `TarefaDao`, `TarefaDatabase`).
 - **Coroutines / Flow** — operações assíncronas de banco de dados e observação reativa da lista de tarefas (`Flow` → `StateFlow`).
 - **ViewModel** — retenção de estado da UI sobrevivendo a mudanças de configuração.
@@ -13,7 +13,7 @@ Aplicativo Android de lista de tarefas desenvolvido como atividade individual da
 
 ## Arquitetura
 
-O projeto segue o padrão **UI (Compose) → ViewModel → Repository → DAO (Room)**:
+O projeto segue o padrão **MVVM**, com o fluxo **UI (Compose) → ViewModel → Repository → DAO (Room)**:
 
 ```
 ListaTarefasScreen ─┐
@@ -25,9 +25,9 @@ FormularioTarefaScreen ─┘
 
 Fica em `repository/TarefaRepository.kt` e é a camada intermediária entre a ViewModel e o banco de dados. Sua responsabilidade é abstrair o acesso ao `TarefaDao`, expondo:
 
-- `tarefas: Flow<List<Tarefa>>` — fluxo reativo com todas as tarefas cadastradas, ordenadas por data de criação.
+- `tarefas: Flow<List<Tarefa>>` — fluxo reativo com todas as tarefas cadastradas, ordenadas por prazo (tarefas com prazo primeiro, do mais próximo ao mais distante; tarefas sem prazo por último, das mais recentes para as mais antigas).
 - `suspend fun inserir(tarefa: Tarefa)` — insere uma nova tarefa.
-- `suspend fun atualizar(tarefa: Tarefa)` — atualiza uma tarefa existente (usado tanto ao editar título/descrição quanto ao marcar/desmarcar como concluída).
+- `suspend fun atualizar(tarefa: Tarefa)` — atualiza uma tarefa existente (usado tanto ao editar os dados quanto ao marcar/desmarcar como concluída).
 - `suspend fun deletar(tarefa: Tarefa)` — remove uma tarefa.
 
 Ela não conhece a UI nem o Android Framework diretamente (exceto pelo `TarefaDao` injetado), o que mantém a lógica de acesso a dados isolada e testável.
@@ -38,23 +38,34 @@ Fica em `viewmodel/TarefaViewModel.kt` e é responsável por conectar o Reposito
 
 - Expõe `tarefas: StateFlow<List<Tarefa>>`, convertendo o `Flow` do Repository em um `StateFlow` (via `stateIn`) com `SharingStarted.WhileSubscribed(5_000)`, evitando que a coleta continue rodando sem tela ativa.
 - Expõe as funções `inserir`, `atualizar` e `deletar`, cada uma disparando uma coroutine em `viewModelScope.launch` para não bloquear a thread principal.
+- Controla o fluxo de **exclusão segura** com `tarefaParaExcluir: StateFlow<Tarefa?>` e as funções:
+    - `solicitarExclusao(tarefa)` — chamada ao tocar na lixeira; apenas guarda a tarefa pendente, o que abre o diálogo de confirmação. Nada é excluído nesse momento.
+    - `cancelarExclusao()` — limpa a tarefa pendente e fecha o diálogo sem alterar a lista.
+    - `confirmarExclusao()` — exclui exatamente a tarefa guardada e fecha o diálogo, garantindo que somente a tarefa selecionada seja removida.
+
+  Como esse estado fica na ViewModel, o diálogo sobrevive a mudanças de configuração, como a rotação da tela.
 - Possui uma `factory` (companion object) que cria a instância da ViewModel resolvendo a dependência do `TarefaDatabase`/`TarefaDao` e passando o `TarefaRepository` já construído — assim a `MainActivity` não precisa conhecer os detalhes de criação do banco.
 
 ### ListaTarefasScreen
 
-Fica em `ui/ListaTarefasScreen.kt`. Observa o estado da ViewModel com `collectAsStateWithLifecycle()` e repassa a lista para o composable `ListaTarefasContent`, que:
+Fica em `ui/ListaTarefasScreen.kt`. Observa o estado da ViewModel (`tarefas` e `tarefaParaExcluir`) com `collectAsStateWithLifecycle()` e repassa os dados para o composable `ListaTarefasContent`, que:
 
-- Renderiza as tarefas em uma `LazyColumn`, cada uma em um `Card` com `Checkbox` (concluir/desmarcar), título com `TextDecoration.LineThrough` quando concluída, descrição e um `IconButton` de exclusão.
+- Renderiza as tarefas em uma `LazyColumn`, cada uma em um `Card` com `Checkbox` (concluir/desmarcar), título com `TextDecoration.LineThrough` quando concluída, descrição, prazo e um `IconButton` de exclusão.
+- Destaca em vermelho e negrito o prazo das tarefas **atrasadas** (prazo vencido e ainda não concluídas).
 - Clicar no card aciona a edição (`onEditarTarefa`), passando o `id` da tarefa.
 - Um `FloatingActionButton` aciona `onNovaTarefa` para abrir o formulário de cadastro.
-- Toda ação do usuário (concluir, editar, excluir, nova tarefa) é repassada como callback para a `ListaTarefasScreen`, que traduz em chamadas à `TarefaViewModel` (`atualizar`, `deletar`) — o composable de conteúdo (`ListaTarefasContent`) não conhece a ViewModel diretamente, o que facilita os `@Preview`s.
+- Quando existe uma tarefa pendente de exclusão, exibe o `ConfirmarExclusaoDialog` (um `AlertDialog` do Material 3) **sobre a própria tela da lista**, sem navegar para outra tela. O diálogo informa que a tarefa será excluída, mostra o título dela e oferece os botões **Cancelar** e **Excluir**.
+- Toda ação do usuário (concluir, editar, excluir, confirmar/cancelar exclusão, nova tarefa) é repassada como callback para a `ListaTarefasScreen`, que traduz em chamadas à `TarefaViewModel` — o composable de conteúdo (`ListaTarefasContent`) não conhece a ViewModel diretamente, o que facilita os `@Preview`s.
+
+Previews disponíveis: lista com tarefas, lista vazia, item pendente, item concluído, **confirmação de exclusão sobre a lista** e **diálogo de confirmação de exclusão**.
 
 ### FormularioTarefaScreen
 
 Fica em `ui/FormularioTarefaScreen.kt` e atende tanto o cadastro quanto a edição de uma tarefa através de um único parâmetro, `tarefaId`:
 
 - Quando `tarefaId == 0`, o formulário está em **modo de cadastro**: os campos começam vazios e, ao salvar, chama `viewModel.inserir(...)`.
-- Quando `tarefaId != 0`, o formulário está em **modo de edição**: busca a tarefa correspondente na lista observada da ViewModel (`tarefas.find { it.id == tarefaId }`), pré-preenche os campos de título e descrição e, ao salvar, chama `viewModel.atualizar(...)` mantendo o `id` original.
+- Quando `tarefaId != 0`, o formulário está em **modo de edição**: busca a tarefa correspondente na lista observada da ViewModel (`tarefas.find { it.id == tarefaId }`), pré-preenche os campos e, ao salvar, chama `viewModel.atualizar(...)` mantendo o `id` original.
+- Permite definir data e hora de prazo para a tarefa.
 - Em ambos os casos, ao salvar ou ao clicar no ícone de voltar da `TopAppBar`, a navegação retorna para a tela anterior (`onVoltar`).
 
 ### AppNavigation
@@ -66,7 +77,7 @@ Fica em `navegation/AppNavigation.kt` e define o grafo de navegação com `NavHo
 | `"lista"` (rota inicial) | `ListaTarefasScreen` | Navega para `"formulario/0"` (nova tarefa) ou `"formulario/{id}"` (editar) |
 | `"formulario/{tarefaId}"` | `FormularioTarefaScreen` | Lê o argumento `tarefaId` da rota e repassa para o formulário; `0` indica cadastro, qualquer outro valor indica edição do registro com aquele id |
 
-Essa passagem do `id` pela própria rota é o que permite que a `FormularioTarefaScreen` decida, sozinha, se está em modo de criação ou edição.
+Essa passagem do `id` pela própria rota é o que permite que a `FormularioTarefaScreen` decida, sozinha, se está em modo de criação ou edição. A confirmação de exclusão não possui rota própria: ela acontece por diálogo dentro da rota `"lista"`.
 
 ### MainActivity
 
@@ -88,26 +99,33 @@ Fica em `MainActivity.kt` e é o ponto de entrada do app. Em `onCreate`, dentro 
 - ✅ Cadastrar nova tarefa.
 - ✅ Editar tarefa existente.
 - ✅ Marcar/desmarcar tarefa como concluída.
-- ✅ Excluir tarefa.
+- ✅ Definir prazo (data e hora) para a tarefa.
+- ✅ Ordenar as tarefas por prazo.
+- ✅ Destacar tarefas atrasadas.
+- ✅ Excluir tarefa com diálogo de confirmação (**Cancelar** / **Excluir**) exibido sobre a lista.
 - ✅ Navegar entre a lista e o formulário sem encerrar o app.
 - ✅ Persistência local dos dados via Room.
 
 ## Evidências
 
-As imagens abaixo estão na pasta [`prints/`](./prints) na raiz do repositório.
+As imagens estão na pasta [`docs/prints/`](docs/prints/) deste repositório.
 
 ### Tela inicial com a lista de tarefas
 
-![Tela inicial](/prints/telainicial.png)
+![Tela inicial](docs/prints/telainicial.png)
 
 ### Cadastro de uma nova tarefa
 
-![Tela de cadastro](/prints/teladecadastramento.png)
+![Tela de cadastro](docs/prints/teladecadastramento.png)
 
 ### Tarefa cadastrada aparecendo na lista
 
-![Lista com tarefa](/prints/telacomtarefa.png)
+![Lista com tarefa](docs/prints/telacomtarefa.png)
 
 ### Tarefa marcada como concluída
 
-![Tarefa concluída](/prints/tarefaconcluida.png)
+![Tarefa concluída](docs/prints/tarefaconcluida.png)
+
+### Exclusão com confirmação
+
+A sequência completa (lista antes da exclusão, diálogo aberto, cancelamento, nova abertura e confirmação) está documentada em [EVIDENCIAS_EXCLUSAO.md](EVIDENCIAS_EXCLUSAO.md), com as imagens em [`docs/prints/exclusao/`](docs/prints/exclusao/).
